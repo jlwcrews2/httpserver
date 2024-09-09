@@ -2,34 +2,44 @@ package no.jlwcrews.httpserver;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class HttpRequestHandler {
+public class HttpRequestHandler extends Thread {
 
-    public static HttpResponse handleRequest(BufferedReader in) throws IOException {
+    private final Socket clientSocket;
+    private final PrintWriter out;
+    private final BufferedReader in;
 
+    public HttpRequestHandler(Socket clientSocket) throws IOException {
+        this.clientSocket = clientSocket;
+        this.out = new PrintWriter(clientSocket.getOutputStream());
+        this.in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    }
+
+    @Override
+    public void run() {
+        System.out.println("Client thread started");
         HttpRequest request = new HttpRequest();
 
-        parseRequestLine(in, request);
-        parseHeaders(in, request);
-        if (Objects.equals(request.getHttpMethod(), "POST")) parseBody(in, request);
-        System.out.println(request);
-        return createResponse();
+        try {
+            parseRequestLine(request);
+            parseHeaders(request);
+            if (Objects.equals(request.getHttpMethod(), "POST")) parseBody(request);
+            System.out.println(request);
+
+            sendResponse(new HttpResponseBuilder(request).build());
+            System.out.println("Client thread finished");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private static HttpResponse createResponse() {
-        HttpResponse response = new HttpResponse();
-        String responseLine = "HTTP/1.1 200 OK";
-        String body = "<H1>Hello this a cool and excellent server</H1>";
-        response.setHttpStatusLine(responseLine);
-        response.setHeaders(Map.of("Content-Type", "text/html", "Content-Length", String.valueOf(body.length())));
-        response.setBody(body);
-        return response;
-    }
-
-    private static void parseBody(BufferedReader in, HttpRequest request) throws IOException {
+    private void parseBody(HttpRequest request) throws IOException {
         StringBuilder builder = new StringBuilder();
         int length = Integer.parseInt(request.getHeaders().get("Content-Length"));
         for (int i = 0; i < length; i++) {
@@ -38,7 +48,7 @@ public class HttpRequestHandler {
         request.setBody(builder.toString());
     }
 
-    private static void parseHeaders(BufferedReader in, HttpRequest request) throws IOException {
+    private void parseHeaders(HttpRequest request) throws IOException {
         Map<String, String> headers = new HashMap<>();
         String currentHeaderLine = in.readLine();
         while(!currentHeaderLine.isEmpty()) {
@@ -49,10 +59,20 @@ public class HttpRequestHandler {
         request.setHeaders(headers);
     }
 
-    private static void parseRequestLine(BufferedReader in, HttpRequest request) throws IOException {
+    private void parseRequestLine(HttpRequest request) throws IOException {
         String[] requestLine = in.readLine().split(" ");
         request.setHttpMethod(requestLine[0]);
         request.setHttpResource(requestLine[1]);
         request.setHttpVersion(requestLine[2]);
+    }
+
+    private void sendResponse(HttpResponse response) throws IOException {
+        out.println(response.getHttpStatusLine());
+        response.getHeaders().forEach((key, value) -> out.println(key + ":" + value));
+        out.println();
+        out.println(response.getBody());
+        out.close();
+        in.close();
+        clientSocket.close();
     }
 }
