@@ -34,6 +34,7 @@ public class HttpServer {
                 var headers = readHeaders();
                 headers.forEach((key, value) -> System.out.println(key + ":" + value));
                 if (httpMethod.equals("POST") || httpMethod.equals("PUT")) {
+                    System.out.println(httpMethod);
                     var body = readBody(headers);
                     System.out.println(body);
                 }
