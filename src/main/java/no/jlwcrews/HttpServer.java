@@ -62,13 +62,13 @@ public class HttpServer {
     }
 
     private String readBody(Map<String, String> headers) throws IOException {
-        StringBuilder bodyBuilder = new StringBuilder();
+        StringBuilder stringBuilder = new StringBuilder();
         int contentLength = Integer.parseInt(headers.get("Content-Length"));
         for (int i = 0; i < contentLength; i++) {
             var c = (char) in.read();
-            bodyBuilder.append(c);
+            stringBuilder.append(c);
         }
-        return bodyBuilder.toString();
+        return stringBuilder.toString();
     }
 
     private void sendResponse(){
